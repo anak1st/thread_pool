@@ -1,6 +1,7 @@
 #include <mutex>
 #include <optional>
 #include <queue>
+#include <shared_mutex>
 
 template <typename T>
 class safe_queue {
@@ -9,25 +10,24 @@ class safe_queue {
   safe_queue(const safe_queue<T>&) = delete;
   safe_queue& operator=(const safe_queue<T>&) = delete;
 
-
   auto empty() -> bool const {
-    std::lock_guard<std::mutex> lock(m);
+    std::shared_lock<std::shared_mutex> lock(m);
     return q.empty();
   }
 
   auto size() -> size_t const {
-    std::lock_guard<std::mutex> lock(m);
+    std::shared_lock<std::shared_mutex> lock(m);
     return q.size();
   }
 
   void push(const T& value) {
-    std::lock_guard<std::mutex> lock(m);
+    std::unique_lock<std::shared_mutex> lock(m);
     q.push(value);
   }
-  
+
   // 从队列中取出元素，如果队列为空，返回std::nullopt
   auto pop() -> std::optional<T> {
-    std::lock_guard<std::mutex> lock(m);
+    std::unique_lock<std::shared_mutex> lock(m);
     if (q.empty()) {
       return std::nullopt;
     }
@@ -37,6 +37,6 @@ class safe_queue {
   }
 
  private:
-  std::mutex m;
+  std::shared_mutex m;  // 读写锁，相比 std::mutex，支持多个线程同时读
   std::queue<T> q;
 };

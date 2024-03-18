@@ -23,8 +23,8 @@ class thread_pool {
 
           // 如果任务队列为空，阻塞当前线程
           if (m_pool->m_queue.empty()) {
-            m_pool->m_conditional_lock.wait(
-                lock);  // 等待条件变量通知，开启线程
+            // 等待条件变量通知，开启线程
+            m_pool->m_conditional_lock.wait(lock);  
           }
 
           // 取出任务队列中的元素
@@ -52,7 +52,7 @@ class thread_pool {
  public:
   // 线程池构造函数
   thread_pool(const int n_threads = 4)
-      : m_threads(std::vector<std::thread>(n_threads)), m_shutdown(false) {}
+      : m_threads(n_threads), m_shutdown(false) {}
 
   // 删除所有拷贝构造函数和赋值操作符
   thread_pool(const thread_pool &) = delete;
@@ -88,11 +88,10 @@ class thread_pool {
         std::bind(std::forward<F>(f), std::forward<Args>(args)...);
 
     // 创建一个 shared_ptr<packaged_task> 对象，用于异步获取任务结果
-    // 
     auto task_ptr =
         std::make_shared<std::packaged_task<return_type()>>(func);
 
-    // 包装任务函数到void函数
+    // 包装任务函数为void函数
     std::function<void()> warpper_func = [task_ptr]() { (*task_ptr)(); };
 
     // 队列通用安全封包函数，并压入安全队列

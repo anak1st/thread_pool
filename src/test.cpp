@@ -1,52 +1,39 @@
 // test.cpp
 
-#include <iostream>
 #include <random>
+#include <chrono>
+#include <fmt/core.h>
 
 #include "thread_pool.hpp"
+#include "randint.hpp"
 
-template <typename T>
-class RandInt {
-  static_assert(std::is_integral<T>::value, "RandInt requires an integral type");
 
-  public:
-    RandInt(T min, T max) : mt{std::random_device{}()}, dist(min, max) {}
-
-    T operator()() {
-      return dist(mt);
-    }
-
-  private:
-    std::mt19937 mt;
-    std::uniform_int_distribution<T> dist;
-};
-
-auto rnd = RandInt<int>(0, 1000);
+auto rnd = randint<int>(500, 600);
 
 // 设置线程睡眠时间
 void simulate_hard_computation() {
-  std::this_thread::sleep_for(std::chrono::milliseconds(2000 + rnd()));
+  std::this_thread::sleep_for(std::chrono::milliseconds(rnd()));
 }
 
 // 添加两个数字的简单函数并打印结果
 void multiply(const int a, const int b) {
   simulate_hard_computation();
   const int res = a * b;
-  std::cout << a << " * " << b << " = " << res << std::endl;
+  fmt::println("{} * {} = {}", a, b, res);
 }
 
 // 添加并输出结果
 void multiply_output(int &out, const int a, const int b) {
   simulate_hard_computation();
   out = a * b;
-  std::cout << a << " * " << b << " = " << out << std::endl;
+  fmt::println("{} * {} = {}", a, b, out);
 }
 
 // 结果返回
 int multiply_return(const int a, const int b) {
   simulate_hard_computation();
   const int res = a * b;
-  std::cout << a << " * " << b << " = " << res << std::endl;
+  fmt::println("{} * {} = {}", a, b, res);
   return res;
 }
 
@@ -70,20 +57,22 @@ void example() {
 
   // 等待乘法输出完成
   future1.get();
-  std::cout << "Last operation result is equals to " << output_ref << std::endl;
+  fmt::println("Last operation result is equals to {}", output_ref);
 
   // 使用return参数提交函数
   auto future2 = pool.submit(multiply_return, 5, 3);
 
   // 等待乘法输出完成
   int res = future2.get();
-  std::cout << "Last operation result is equals to " << res << std::endl;
+  fmt::println("Last operation result is equals to {}", res);
 
   // 关闭线程池
   pool.shutdown();
 }
 
 int main() {
+  fmt::println("Build time: {} {}", __DATE__, __TIME__);
+
   example();
 
   return 0;
