@@ -1,5 +1,11 @@
 # thread_pool
- 
+
+## 所用技术
+- shared_mutex 
+- condition_variable
+- future
+
+
 ## 使用方法
 ```cpp
 #include <random>

@@ -5,7 +5,16 @@
 #include <thread>
 
 #include "safe_queue.hpp"
+#include "concurrent_queue.hpp"
 
+
+namespace queue {
+  using safe = safe_queue<std::function<void()>>;
+  using concurrent = concurrent_queue<std::function<void()>>;
+}
+
+
+template <typename Q>
 class thread_pool {
  private:
   class thread_worker {  // 内置线程工作类
@@ -17,22 +26,22 @@ class thread_pool {
 
     void operator()() {
       while (!m_pool->m_shutdown) {
-        std::optional<std::function<void()>> func;  // 函数对象
+        std::shared_ptr<std::function<void()>> func = nullptr;
         {  // 为线程环境加锁，互访问工作线程的休眠和唤醒
           std::unique_lock<std::mutex> lock(m_pool->m_conditional_mutex);
 
           // 如果任务队列为空，阻塞当前线程
           if (m_pool->m_queue.empty()) {
             // 等待条件变量通知，开启线程
-            m_pool->m_conditional_lock.wait(lock);  
+            m_pool->m_conditional_lock.wait(lock);
           }
 
           // 取出任务队列中的元素
           func = m_pool->m_queue.pop();
         }
         // 如果成功取出，执行工作函数
-        if (func.has_value()) {
-          func.value()();
+        if (func) {
+          (*func)();
         }
       }
     }
@@ -40,7 +49,7 @@ class thread_pool {
 
   bool m_shutdown;  // 线程池是否关闭
 
-  safe_queue<std::function<void()>> m_queue;  // 执行函数安全队列，即任务队列
+  Q m_queue;  // 执行函数安全队列，即任务队列
 
   std::vector<std::thread> m_threads;  // 工作线程队列
 
@@ -66,6 +75,12 @@ class thread_pool {
     }
   }
 
+  void wait() {
+    while (!m_queue.empty()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+  }
+
   // 等待线程完成当前任务并关闭线程池
   void shutdown() {
     m_shutdown = true;
@@ -88,14 +103,13 @@ class thread_pool {
         std::bind(std::forward<F>(f), std::forward<Args>(args)...);
 
     // 创建一个 shared_ptr<packaged_task> 对象，用于异步获取任务结果
-    auto task_ptr =
-        std::make_shared<std::packaged_task<return_type()>>(func);
+    auto task_ptr = std::make_shared<std::packaged_task<return_type()>>(func);
 
     // 包装任务函数为void函数
     std::function<void()> warpper_func = [task_ptr]() { (*task_ptr)(); };
 
     // 队列通用安全封包函数，并压入安全队列
-    m_queue.push(warpper_func);
+    m_queue.push(std::move(warpper_func));
 
     // 唤醒一个等待中的线程
     m_conditional_lock.notify_one();
@@ -103,4 +117,6 @@ class thread_pool {
     // 返回先前注册的任务指针
     return task_ptr->get_future();
   }
+
+  size_t size() { return m_queue.size(); }
 };

@@ -1,5 +1,3 @@
-#include <mutex>
-#include <optional>
 #include <queue>
 #include <shared_mutex>
 
@@ -7,8 +5,8 @@ template <typename T>
 class safe_queue {
  public:
   safe_queue() = default;
-  safe_queue(const safe_queue<T>&) = delete;
-  safe_queue& operator=(const safe_queue<T>&) = delete;
+  safe_queue(const safe_queue<T> &) = delete;
+  safe_queue &operator=(const safe_queue<T> &) = delete;
 
   auto empty() -> bool const {
     std::shared_lock<std::shared_mutex> lock(m);
@@ -20,20 +18,20 @@ class safe_queue {
     return q.size();
   }
 
-  void push(const T& value) {
+  void push(const T &value) {
     std::unique_lock<std::shared_mutex> lock(m);
     q.push(value);
   }
 
-  // 从队列中取出元素，如果队列为空，返回std::nullopt
-  auto pop() -> std::optional<T> {
-    std::unique_lock<std::shared_mutex> lock(m);
+  // 从队列中取出元素，如果队列为空，返回 nullptr
+  auto pop() -> std::shared_ptr<T> {
     if (q.empty()) {
-      return std::nullopt;
+      return nullptr;
     }
+    std::unique_lock<std::shared_mutex> lock(m);
     T value = std::move(q.front());
     q.pop();
-    return value;
+    return std::make_shared<T>(value);
   }
 
  private:
