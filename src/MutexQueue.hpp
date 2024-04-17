@@ -1,12 +1,17 @@
+#pragma once
+
 #include <queue>
 #include <shared_mutex>
 
+namespace XF {
+namespace Queue {
+
 template <typename T>
-class safe_queue {
+class MutexQueue {
  public:
-  safe_queue() = default;
-  safe_queue(const safe_queue<T> &) = delete;
-  safe_queue &operator=(const safe_queue<T> &) = delete;
+  MutexQueue() = default;
+  MutexQueue(const MutexQueue<T> &) = delete;
+  MutexQueue &operator=(const MutexQueue<T> &) = delete;
 
   auto empty() -> bool const {
     std::shared_lock<std::shared_mutex> lock(m);
@@ -24,17 +29,20 @@ class safe_queue {
   }
 
   // 从队列中取出元素，如果队列为空，返回 nullptr
-  auto pop() -> std::shared_ptr<T> {
+  auto pop(T &v) -> bool {
     if (q.empty()) {
-      return nullptr;
+      return false;
     }
     std::unique_lock<std::shared_mutex> lock(m);
-    T value = std::move(q.front());
+    v = std::move(q.front());
     q.pop();
-    return std::make_shared<T>(value);
+    return true;
   }
 
  private:
   std::shared_mutex m;  // 读写锁，相比 std::mutex，支持多个线程同时读
   std::queue<T> q;
 };
+
+}  // namespace Queue
+}  // namespace XF

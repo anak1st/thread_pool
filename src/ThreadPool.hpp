@@ -4,29 +4,28 @@
 #include <mutex>
 #include <thread>
 
-#include "safe_queue.hpp"
-#include "concurrent_queue.hpp"
+#include "LockfreeCircularQueue.hpp"
+#include "MutexQueue.hpp"
 
+namespace XF {
 
-namespace queue {
-  using safe = safe_queue<std::function<void()>>;
-  using concurrent = concurrent_queue<std::function<void()>>;
-}
+using FMutexQueue = Queue::MutexQueue<std::function<void()>>;
+using FLockfreeQueue = Queue::LockfreeCircularQueue<std::function<void()>>;
 
-
-template <typename Q>
-class thread_pool {
+template <typename Q = FMutexQueue>
+class ThreadPool {
  private:
   class thread_worker {  // 内置线程工作类
    private:
-    int m_id;             // 工作id
-    thread_pool *m_pool;  // 所属线程池
+    int m_id;            // 工作id
+    ThreadPool *m_pool;  // 所属线程池
    public:
-    thread_worker(thread_pool *pool, const int id) : m_pool(pool), m_id(id) {}
+    thread_worker(ThreadPool *pool, const int id) : m_pool(pool), m_id(id) {}
 
     void operator()() {
       while (!m_pool->m_shutdown) {
-        std::shared_ptr<std::function<void()>> func = nullptr;
+        std::function<void()> func;
+        bool ok = false;
         {  // 为线程环境加锁，互访问工作线程的休眠和唤醒
           std::unique_lock<std::mutex> lock(m_pool->m_conditional_mutex);
 
@@ -37,11 +36,11 @@ class thread_pool {
           }
 
           // 取出任务队列中的元素
-          func = m_pool->m_queue.pop();
+          ok = m_pool->m_queue.pop(func);
         }
         // 如果成功取出，执行工作函数
-        if (func) {
-          (*func)();
+        if (ok) {
+          func();
         }
       }
     }
@@ -60,14 +59,14 @@ class thread_pool {
 
  public:
   // 线程池构造函数
-  thread_pool(const int n_threads = 4)
+  ThreadPool(const int n_threads = 4)
       : m_threads(n_threads), m_shutdown(false) {}
 
   // 删除所有拷贝构造函数和赋值操作符
-  thread_pool(const thread_pool &) = delete;
-  thread_pool(thread_pool &&) = delete;
-  thread_pool &operator=(const thread_pool &) = delete;
-  thread_pool &operator=(thread_pool &&) = delete;
+  ThreadPool(const ThreadPool &) = delete;
+  ThreadPool(ThreadPool &&) = delete;
+  ThreadPool &operator=(const ThreadPool &) = delete;
+  ThreadPool &operator=(ThreadPool &&) = delete;
 
   void init() {
     for (int i = 0; i < m_threads.size(); ++i) {
@@ -120,3 +119,5 @@ class thread_pool {
 
   size_t size() { return m_queue.size(); }
 };
+
+}  // namespace XF

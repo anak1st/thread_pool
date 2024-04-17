@@ -2,52 +2,49 @@
 
 ## 所用技术
 - shared_mutex 
-- condition_variable
-- future
+- mutex, condition_variable
+- future, packaged_task
+- atomic, lockfree queue
+
+###
+- 互斥锁队列
+- 无锁队列，使用CAS操作，实现无锁（循环）队列，性能提升大约10%
 
 
 ## 使用方法
 ```cpp
-#include <random>
-#include <chrono>
-#include <fmt/core.h>
-
-#include "thread_pool.hpp"
-#include "randint.hpp"
-
-
-auto rnd = randint<int>(500, 600);
-
 // 设置线程睡眠时间
 void simulate_hard_computation() {
-  std::this_thread::sleep_for(std::chrono::milliseconds(rnd()));
+  std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
 // 添加两个数字的简单函数并打印结果
 void multiply(const int a, const int b) {
   simulate_hard_computation();
   const int res = a * b;
-  fmt::println("{} * {} = {}", a, b, res);
+  // fmt::println("{} * {} = {}", a, b, res);
 }
 
 // 添加并输出结果
 void multiply_output(int &out, const int a, const int b) {
   simulate_hard_computation();
   out = a * b;
-  fmt::println("{} * {} = {}", a, b, out);
+  // fmt::println("{} * {} = {}", a, b, out);
 }
 
 // 结果返回
 int multiply_return(const int a, const int b) {
   simulate_hard_computation();
   const int res = a * b;
-  fmt::println("{} * {} = {}", a, b, res);
+  // fmt::println("{} * {} = {}", a, b, res);
   return res;
 }
 
 void example() {
   // 创建3个线程的线程池
-  thread_pool pool(3);
+  timer my_timer;
+  XF::ThreadPool<XF::FMutexQueue> pool(16);     // 使用带互斥锁的队列
+  XF::ThreadPool<XF::FLockfreeQueue> pool(16);  // 使用无锁队列
 
   // 初始化线程池
   pool.init();
@@ -72,10 +69,11 @@ void example() {
 
   // 等待乘法输出完成
   int res = future2.get();
-  fmt::println("Last operation result is equals to {}", res);
+  // fmt::println("Last operation result is equals to {}", res);
 
   // 关闭线程池
   pool.shutdown();
+  fmt::println("Elapsed time: {} ms", my_timer.elapsed());
 }
 
 ```
